@@ -36,7 +36,7 @@
     </Reference>
     <Reference Include="ExcelDna.Integration, Version=0.33.5730.40390, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\ExcelDna.Integration.0.33.9\lib\ExcelDna.Integration.dll</HintPath>
-      <Private>False</Private>
+      <Private>True</Private>
     </Reference>
     <Reference Include="ExcelDna.IntelliSense, Version=1.0.0.1547, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\ExcelDna.IntelliSense.1.0.0\lib\net40\ExcelDna.IntelliSense.dll</HintPath>
@@ -315,6 +315,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>xcopy "$(SolutionDir)\packages\ExcelDna.AddIn.0.33.9\tools\ExcelDna.xll" "$(TargetDir)ExcelScript-AddIn.xll*" /C /Y
+xcopy "$(SolutionDir)\packages\ExcelDna.AddIn.0.33.9\tools\ExcelDna64.xll" "$(TargetDir)ExcelScript-AddIn64.xll*" /C /Y
 xcopy "$(SolutionDir)\Resources\Examples.xlsm*" "$(TargetDir)Examples.xlsm*" /C /Y
 xcopy "$(TargetDir)ExcelScript-AddIn.dna*" "$(TargetDir)ExcelScript-AddIn64.dna*" /C /Y
 xcopy "$(TargetDir)ExcelScript-AddIn.xll.config*" "$(TargetDir)ExcelScript-AddIn64.xll.config*" /C /Y

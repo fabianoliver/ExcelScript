@@ -39,13 +39,7 @@ namespace ExcelScript
 
             return "Registered.";
         }
-
-        [ExcelFunction]
-        public static object __DEBUG__TEXT(Excel.Range r)
-        {
-            return r.Address;
-        }
-
+   
         private static ExcelFunctionRegistration ToExcelFunctionRegistration(IScript script, string FunctionName)
         {
             var paramExprs = script
