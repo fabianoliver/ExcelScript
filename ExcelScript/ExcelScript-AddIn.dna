@@ -1,0 +1,30 @@
+<DnaLibrary Name="ExcelScript Add-In" RuntimeVersion="v4.0">
+  <ExternalLibrary Path="ExcelScript.dll" LoadFromBytes="true" Pack="true" ExplicitRegistration="true" />
+  <Reference Path="System.Reflection.Metadata.dll"                    Pack="true" />
+  <Reference Path="System.Collections.Immutable.dll"                  Pack="true" />
+  <Reference Path="System.Console.dll"                                Pack="true" />
+  <Reference Path="System.Diagnostics.FileVersionInfo.dll"            Pack="true" />
+  <Reference Path="System.Diagnostics.StackTrace.dll"                 Pack="true" />
+  <Reference Path="System.IO.FileSystem.dll"                          Pack="true" />
+  <Reference Path="System.IO.FileSystem.Primitives.dll"               Pack="true" />
+  <Reference Path="System.Security.Cryptography.Algorithms.dll"       Pack="true" />
+  <Reference Path="System.Security.Cryptography.Encoding.dll"         Pack="true" />
+  <Reference Path="System.Security.Cryptography.Primitives.dll"       Pack="true" />
+  <Reference Path="System.Security.Cryptography.X509Certificates.dll" Pack="true" />
+  <Reference Path="System.Text.Encoding.CodePages.dll"                Pack="true" />
+  <Reference Path="System.Threading.Thread.dll"                       Pack="true" />
+  <Reference Path="System.Xml.XmlDocument.dll"                        Pack="true" />
+  <Reference Path="System.Xml.XPath.dll"                              Pack="true" />
+  <Reference Path="System.Xml.XPath.XDocument.dll"                    Pack="true" />
+  <Reference Path="Microsoft.CodeAnalysis.CSharp.dll"                 Pack="true" />
+  <Reference Path="Microsoft.CodeAnalysis.CSharp.Scripting.dll"       Pack="true" />
+  <Reference Path="Microsoft.CodeAnalysis.dll"                        Pack="true" />
+  <Reference Path="Microsoft.CodeAnalysis.Scripting.dll"              Pack="true" />
+  <Reference Path="RoslynScripting.dll"                               Pack="true" />
+  <Reference Path="System.AppContext.dll"                             Pack="true" />
+  <Reference Path="ExcelDna.IntelliSense.dll"                         Pack="true" />
+  <Reference Path="UIAComWrapper.dll"                                 Pack="true" />
+  <Reference Path="Interop.UIAutomationClient.dll"                    Pack="true" />
+  <Reference Path="XLParser.dll"                                      Pack="true" />
+  <Reference Path="Irony.dll"                                         Pack="true" />
+</DnaLibrary>

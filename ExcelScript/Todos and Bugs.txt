@@ -1,0 +1,4 @@
+﻿1. Do return-value conversion / cross domain boxing
+2. Do conversion from Range to Array types2
+3. Implement an RunAsync() excel function
+4. Extend Unit Tests
