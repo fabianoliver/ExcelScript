@@ -2,6 +2,7 @@
 using ExcelScript.Registration;
 using ScriptingAbstractions;
 using System;
+using System.Diagnostics;
 using System.Linq;
 
 namespace ExcelScript

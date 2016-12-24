@@ -16,6 +16,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using Excel = NetOffice.ExcelApi;
 
@@ -60,6 +61,9 @@ namespace ExcelScript
         {
             if (TargetDomain != AppDomain.CurrentDomain)
                 throw new InvalidOperationException($"Tried to create script globals for AppDomain {TargetDomain}, but was called in AppDomain {AppDomain.CurrentDomain}");
+
+            var excelDnaUtilInitialize = typeof(ExcelDnaUtil).GetMethod("Initialize", BindingFlags.Static | BindingFlags.NonPublic);
+            excelDnaUtilInitialize.Invoke(null, Array.Empty<object>());
 
             var typename = typeof(Globals).AssemblyQualifiedName;
             Type type = Type.GetType(typename);

@@ -8,8 +8,8 @@ using System.Xml.Serialization;
 
 namespace RoslynScripting
 {
-    [Serializable]
-    public class Parameter : IXmlSerializable, IParameter
+  //  [Serializable]
+    public class Parameter : MarshalByRefObject, IXmlSerializable, IParameter
     {
         [HashValue]
         public string Name { get; set; }

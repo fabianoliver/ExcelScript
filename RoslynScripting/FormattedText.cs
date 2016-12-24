@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace RoslynScripting
 {
-    [Serializable]
+   // [Serializable]
     public struct TextSpan
     {
         public readonly int Start;
@@ -34,8 +34,8 @@ namespace RoslynScripting
         }
     }
 
-    [Serializable]
-    public class TextFormat
+    //[Serializable]
+    public class TextFormat : MarshalByRefObject
     {
         public readonly Color TextColor;
 
@@ -45,8 +45,8 @@ namespace RoslynScripting
         }
     }
 
-    [Serializable]
-    public class FormattedTextLinePart
+   // [Serializable]
+    public class FormattedTextLinePart : MarshalByRefObject
     {
         /// <summary>
         /// Line number of the text
@@ -81,8 +81,8 @@ namespace RoslynScripting
         }
     }
 
-    [Serializable]
-    public class FormattedTextLine
+   // [Serializable]
+    public class FormattedTextLine : MarshalByRefObject
     {
         /// <summary>
         /// The text this line is part of
@@ -121,7 +121,9 @@ namespace RoslynScripting
 
         public FormattedTextLinePart AppendText(string Text, TextFormat Format)
         {
-            int SpanStart = _Parts.Any() ? _Parts.Last().LineSpan.End : 0;
+            var lastPart = Parts.Last();
+            var lastPartLineSpan = lastPart.LineSpan;
+            int SpanStart = _Parts.Any() ? lastPartLineSpan.End : 0;
             int SpanEnd = SpanStart + Text.Length;
 
             var LineSpan = TextSpan.FromBounds(SpanStart, SpanEnd);
@@ -137,8 +139,8 @@ namespace RoslynScripting
         }
     }
 
-    [Serializable]
-    public class FormattedText
+   // [Serializable]
+    public class FormattedText : MarshalByRefObject
     {
         /// <summary>
         /// The lines that make up this text

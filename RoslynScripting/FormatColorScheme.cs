@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace RoslynScripting
 {
-    [Serializable]
+    //[Serializable]
     public struct FormatColorScheme
     {
         public readonly Color Keyword;

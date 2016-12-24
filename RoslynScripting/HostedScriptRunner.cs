@@ -27,7 +27,7 @@ namespace RoslynScripting
     {
         public int RecompilationTriggerHash { get; set; }
         public Assembly CompiledAssembly { get; set; }
-        public IMethodSymbol EntryPoint { get; set; }
+        public MethodInfo EntryPoint { get; set; }
         public Document Document { get; set; }
     }
 
@@ -50,30 +50,28 @@ namespace RoslynScripting
         /// <param name="Options">Options for script execution, compilation or invocation</param>
         /// <param name="submission">Returns an instance of the compiler-generated wrapped script class (e.g. an instance of Submission#0)</param>
         /// <returns>A RemoteTask, so the caller (which could reside in a different AppDomain) can unwrap the results asynchronously</returns>
-        public RemoteTask<object> RunAsync(Func<AppDomain, IScriptGlobals> factory, IParameterValue[] parameters, string scriptCode, ScriptingOptions Options)
+        public RemoteTask<object> RunAsync(Func<AppDomain, IScriptGlobals> factory, IParameterValue[] parameters, string originalScriptCode, ScriptingOptions Options)
         {
             string debug_code_file_path = (Debugger.IsAttached) ? Path.Combine(Path.GetTempPath(), "ExcelScript.DebuggedCode.csx") : null;
             IScriptGlobals globalsInstance = null;
 
             try
             {
-                scriptCode = RewriteCode(scriptCode, parameters, debug_code_file_path);
+                var rewrittenScriptCode = RewriteCode(originalScriptCode, parameters.Select(x => x.Parameter), debug_code_file_path);
 
                 if (debug_code_file_path != null)
                 {
                     // todo: might cause problems in multi threaded scenarios / whenever we're running through the .RunAsync() function in parallel.
                     // possibly create varying or even fully random file paths - though though that might need some cleanup logic
                     string line_directive = (debug_code_file_path == null) ? String.Empty : "#line 1 \"" + debug_code_file_path + "\"" + Environment.NewLine;
-                    File.WriteAllText(debug_code_file_path, scriptCode);
-                    scriptCode = line_directive + scriptCode;
+                    File.WriteAllText(debug_code_file_path, rewrittenScriptCode);
+                    rewrittenScriptCode = line_directive + rewrittenScriptCode;
                 }
 
-                IMethodSymbol entryPoint;
-                var assembly = GetOrCreateScriptAssembly(parameters.Select(x => x.Parameter).ToArray(), scriptCode, Options, debug_code_file_path, out entryPoint);
-
+                MethodInfo entryMethod;
+                var assembly = GetOrCreateScriptAssembly(parameters.Select(x => x.Parameter).ToArray(), originalScriptCode, rewrittenScriptCode, Options, debug_code_file_path, out entryMethod);
                 globalsInstance = CreateGlobals(factory, parameters);
-                var entryMethod = GetEntryMethod(assembly, entryPoint); // the <factory> method
-
+    
                 var result = RemoteTask.ServerStart<object>(cts => InvokeFactoryAsync(entryMethod, globalsInstance));
                 return result;
             }
@@ -124,21 +122,21 @@ namespace RoslynScripting
             }
         }
 
-        public RemoteTask<string> GetRtfFormattedCodeAsync(string scriptCode, ScriptingOptions Options, FormatColorScheme ColorScheme)
+        public RemoteTask<string> GetRtfFormattedCodeAsync(string originalScriptCode, ScriptingOptions Options, FormatColorScheme ColorScheme)
         {
-            var result = RemoteTask.ServerStart<string>(cts => InternalGetRtfFormattedCodeAsync(scriptCode, Options, ColorScheme));
+            var result = RemoteTask.ServerStart<string>(cts => InternalGetRtfFormattedCodeAsync(originalScriptCode, Options, ColorScheme));
             return result;
         }
 
-        public RemoteTask<FormattedText> GetFormattedCodeAsync(string scriptCode, ScriptingOptions Options, FormatColorScheme ColorScheme)
+        public RemoteTask<FormattedText> GetFormattedCodeAsync(string originalScriptCode, ScriptingOptions Options, FormatColorScheme ColorScheme)
         {
-            var result = RemoteTask.ServerStart<FormattedText>(cts => InternalGetFormattedCodeAsync(scriptCode, Options, ColorScheme));
+            var result = RemoteTask.ServerStart<FormattedText>(cts => InternalGetFormattedCodeAsync(originalScriptCode, Options, ColorScheme));
             return result;
         }
 
-        internal async Task<FormattedText> InternalGetFormattedCodeAsync(string scriptCode, ScriptingOptions Options, FormatColorScheme ColorScheme)
+        internal async Task<FormattedText> InternalGetFormattedCodeAsync(string originalScriptCode, ScriptingOptions Options, FormatColorScheme ColorScheme)
         {
-            var document = GetOrCreateDocument(Array.Empty<IParameter>(), scriptCode, Options);
+            var document = GetOrCreateDocument(Array.Empty<IParameter>(), originalScriptCode, Options);
             document = Formatter.FormatAsync(document).Result;
             SourceText documentText = await document.GetTextAsync();
 
@@ -199,10 +197,10 @@ namespace RoslynScripting
             return result;
         }
 
-        internal async Task<string> InternalGetRtfFormattedCodeAsync(string scriptCode, ScriptingOptions Options, FormatColorScheme ColorScheme)
+        internal async Task<string> InternalGetRtfFormattedCodeAsync(string originalScriptCode, ScriptingOptions Options, FormatColorScheme ColorScheme)
         {
 
-            var document = GetOrCreateDocument(Array.Empty<IParameter>(), scriptCode, Options);
+            var document = GetOrCreateDocument(Array.Empty<IParameter>(), originalScriptCode, Options);
             document = Formatter.FormatAsync(document).Result;
             SourceText documentText = await document.GetTextAsync();
 
@@ -318,9 +316,9 @@ namespace RoslynScripting
             return sb.ToString();
         }
 
-        [Serializable]
-        [System.Runtime.Serialization.KnownType(typeof(Parameter))]
-        internal class ParseResult : IParseResult
+        //[Serializable]
+       // [System.Runtime.Serialization.KnownType(typeof(Parameter))]
+        internal class ParseResult : MarshalByRefObject, IParseResult
         {
             public string RefactoredCode { get; private set; }
             public string EntryMethodName { get; private set; }
@@ -345,10 +343,9 @@ namespace RoslynScripting
 
         public RemoteTask<IParseResult> ParseAsync(string scriptCode, ScriptingOptions Options, Func<MethodInfo[], MethodInfo> EntryMethodSelector, Func<MethodInfo, IParameter[]> EntryMethodParameterFactory)
         {
-            IMethodSymbol _scriptEntryMethod;
-            Assembly assembly = GetOrCreateScriptAssembly(new IParameter[0], scriptCode, Options, null, out _scriptEntryMethod);
+            MethodInfo entryMethod;
+            Assembly assembly = GetOrCreateScriptAssembly(new IParameter[0], scriptCode, scriptCode, Options, null, out entryMethod);
 
-            MethodInfo entryMethod = GetEntryMethod(assembly, _scriptEntryMethod); // eg the <factory> method
             Type submissionType = entryMethod.DeclaringType;  // eg typeof(Submission#0)
             MethodInfo[] entryMethodCandidates = GetEntryMethodCandidatesFrom(submissionType);
 
@@ -451,12 +448,12 @@ namespace RoslynScripting
         /// Re-Writes the user code, e.g. by adding additional variable definitions (user-defined parameters)
         /// and adding a line compiler directive, if needed.
         /// </summary>
-        private static string RewriteCode(string scriptCode, IEnumerable<IParameterValue> ParameterValues, string debug_code_file_path)
+        private static string RewriteCode(string scriptCode, IEnumerable<IParameter> ParameterValues, string debug_code_file_path)
         {
             SyntaxTree tree = CSharpSyntaxTree.ParseText(scriptCode, CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
 
             IEnumerable<MemberDeclarationSyntax> statements = ParameterValues
-                .Select(x => $"{x.Parameter.Type.FullName} {x.Parameter.Name} = ({x.Parameter.Type.FullName})Parameters[\"{x.Parameter.Name}\"];{Environment.NewLine}")
+                .Select(x => $"{x.Type.FullName} {x.Name} = ({x.Type.FullName})Parameters[\"{x.Name}\"];{Environment.NewLine}")
                 .Select(x => SyntaxFactory.GlobalStatement(SyntaxFactory.ParseStatement(x)));
 
 
@@ -590,22 +587,29 @@ namespace RoslynScripting
         /// <param name="pdbRawData">Raw bytes of the debug symbols. This is ONLY emitted if there is currently a debugger attached to the process, otherwisen null.</param>
         private void Compile(Compilation compilation, out byte[] assemblyRawData, out byte[] pdbRawData)
         {
-            using (var assemblyStream = new MemoryStream())
+            try
             {
-                using (var symbolStream = (Debugger.IsAttached ? new MemoryStream() : null))
+                using (var assemblyStream = new MemoryStream())
                 {
-                    var emitOptions = new EmitOptions(false, DebugInformationFormat.PortablePdb);
-                    var emitResult = compilation.Emit(assemblyStream, symbolStream, options: emitOptions);
-
-                    if (!emitResult.Success)
+                    using (var symbolStream = (Debugger.IsAttached ? new MemoryStream() : null))
                     {
-                        var errors = string.Join(Environment.NewLine, emitResult.Diagnostics.Select(x => x));
-                        throw new InvalidOperationException("Emit error: " + errors);
-                    }
+                        var emitOptions = new EmitOptions(false, DebugInformationFormat.PortablePdb);
 
-                    assemblyRawData = assemblyStream.ToArray();
-                    pdbRawData = symbolStream?.ToArray();
+                        var emitResult = compilation.Emit(assemblyStream, symbolStream, options: emitOptions);
+
+                        if (!emitResult.Success)
+                        {
+                            var errors = string.Join(Environment.NewLine, emitResult.Diagnostics.Select(x => x));
+                            throw new InvalidOperationException("Emit error: " + errors);
+                        }
+
+                        assemblyRawData = assemblyStream.ToArray();
+                        pdbRawData = symbolStream?.ToArray();
+                    }
                 }
+            } finally
+            {
+                GC.Collect();
             }
         }
 
@@ -715,7 +719,7 @@ namespace RoslynScripting
         {
             // [in]  args[0] -> an instance of the globals variables
             // [out] args[1] -> the constructor of the compiler-generated class (Submission#0) will set this array index to a reference to an instance of the generated class (-> the instance of Submission#0)
-            var args = new object[2] { globalsInstance, null }; // args[0]: globals, args[1]: cancelationtoken
+            var args = new object[2] { globalsInstance, null }; // args[0]: globals, args[1]: will return submission object
 
             var task = (Task<object>)factoryMethodInfo.Invoke(null, new object[] { args });
             
@@ -726,49 +730,33 @@ namespace RoslynScripting
             return result;
         }
 
-        private Assembly GetOrCreateScriptAssembly(IParameter[] parameters, string rewrittenScriptCode, ScriptingOptions Options, string debug_code_file_path = null)
+        private Assembly GetOrCreateScriptAssembly(IParameter[] parameters, string originalScriptCode, string rewrittenScriptCode, ScriptingOptions Options, string debug_code_file_path = null, bool reflectionOnlyLoad = false)
         {
-            IMethodSymbol _unused;
-            return GetOrCreateScriptAssembly(parameters, rewrittenScriptCode, Options, debug_code_file_path, out _unused);
-        }
-
-        /// <summary>
-        /// Crates the CompilationOptions with which the $compilation should be compiled
-        /// </summary>
-        private static CompilationOptions CreateOptionsFor(Compilation compilation)
-        {
-            var compilationOptions = compilation.Options
-                .WithOutputKind(OutputKind.DynamicallyLinkedLibrary);
-
-            if (Debugger.IsAttached)
-            {
-                compilationOptions = compilationOptions.WithOptimizationLevel(OptimizationLevel.Debug);
-            }
-
-            return compilationOptions;
+            MethodInfo _unused;
+            return GetOrCreateScriptAssembly(parameters, originalScriptCode, rewrittenScriptCode, Options, debug_code_file_path, out _unused);
         }
 
         /// <summary>
         /// Compiles an assembly of the script if needed, or returns a cached version if possible
         /// </summary>
-        private Assembly GetOrCreateScriptAssembly(IParameter[] parameters, string rewrittenScriptCode, ScriptingOptions Options, string debug_code_file_path, out IMethodSymbol entryPointSymbol)
+        private Assembly GetOrCreateScriptAssembly(IParameter[] parameters, string originalScriptCode, string rewrittenScriptCode, ScriptingOptions Options, string debug_code_file_path, out MethodInfo entryMethod)
         {
             int new_hash;
-
-            if (NeedsRecompilationFor(parameters, rewrittenScriptCode, Options, out new_hash))
+            // todo: this always seems to suggest we need to recompile
+            if (NeedsRecompilationFor(parameters, originalScriptCode, Options, out new_hash))
             {
                 // TODO: Can I somehow do this by compiling a Document, i.e. without CSharpScript?
                 // The entry methods will look a bit different, but the major issue is - how do I manage globals in a custom compiled assembly?
-                 var options = ToScriptOptions(Options);
+                var options = ToScriptOptions(Options);
 
-                 var script = CSharpScript.Create(rewrittenScriptCode, options: options, globalsType: typeof(TGlobals));
+                var script = CSharpScript.Create(rewrittenScriptCode, options: options, globalsType: typeof(TGlobals));
 
-                 var compilation = script.GetCompilation();
-                 var compilationOptions = CreateOptionsFor(compilation);
-                 compilation = compilation.WithOptions(compilationOptions);
+                var compilation = script.GetCompilation();
+                var compilationOptions = CreateOptionsFor(compilation);
+                compilation = compilation.WithOptions(compilationOptions);
 
-                 byte[] assemblyRawData;
-                 byte[] pdbRawData;
+                byte[] assemblyRawData;
+                byte[] pdbRawData;
 
                 /*
                 var document = CreateDocument(parameters, rewrittenScriptCode, Options);
@@ -787,19 +775,39 @@ namespace RoslynScripting
 
                 Compile(compilation, out assemblyRawData, out pdbRawData);
 
-                var assembly = Assembly.Load(assemblyRawData, pdbRawData);
+                Assembly assembly = Assembly.Load(assemblyRawData, pdbRawData);
 
-                entryPointSymbol = compilation.GetEntryPoint(CancellationToken.None);
-                this.m_LastCompilation = new LastCompilationInfo { CompiledAssembly = assembly, RecompilationTriggerHash = new_hash, EntryPoint = entryPointSymbol };  // update cache info
+                var entryPointSymbol = compilation.GetEntryPoint(CancellationToken.None);
+                entryMethod = GetEntryMethod(assembly, entryPointSymbol);
+                this.m_LastCompilation = new LastCompilationInfo { CompiledAssembly = assembly, RecompilationTriggerHash = new_hash, EntryPoint = entryMethod };  // update cache info
 
                 return assembly;
-            } else
+            }
+            else
             {
                 var compilation = m_LastCompilation.CompiledAssembly;
-                entryPointSymbol = m_LastCompilation.EntryPoint;
+                entryMethod = m_LastCompilation.EntryPoint;
                 return compilation;
             }
         }
+
+        /// <summary>
+        /// Crates the CompilationOptions with which the $compilation should be compiled
+        /// </summary>
+        private static CompilationOptions CreateOptionsFor(Compilation compilation)
+        {
+            var compilationOptions = compilation.Options
+                .WithOutputKind(OutputKind.DynamicallyLinkedLibrary);
+
+            if (Debugger.IsAttached)
+            {
+                compilationOptions = compilationOptions.WithOptimizationLevel(OptimizationLevel.Debug);
+            }
+
+            return compilationOptions;
+        }
+
+     
 
         internal static ScriptOptions ToScriptOptions(ScriptingOptions ScriptingOptions)
         {
@@ -815,11 +823,14 @@ namespace RoslynScripting
         }
 
 
-        private Document GetOrCreateDocument(IParameter[] parameters, string rewrittenScriptCode, ScriptingOptions Options)
+        private Document GetOrCreateDocument(IParameter[] parameters, string originalScriptCode, ScriptingOptions Options)
         {
-            int new_hash;
+            var rewrittenScriptCode = RewriteCode(originalScriptCode, parameters, null);
 
-            if (NeedsRecompilationFor(parameters, rewrittenScriptCode, Options, out new_hash))
+            int new_hash;
+            // todo...
+
+            if (NeedsRecompilationFor(parameters, originalScriptCode, Options, out new_hash))
             {
                 return CreateDocument(parameters, rewrittenScriptCode, Options);
             } else
@@ -865,9 +876,9 @@ namespace RoslynScripting
         /// </summary>
         /// <param name="hash">RecompilationTriggerHash for the other input parameters ($parameters, $scriptCode and $Options)</param>
         /// <returns></returns>
-        private bool NeedsRecompilationFor(IParameter[] parameters, string scriptCode, ScriptingOptions Options, out int hash)
+        private bool NeedsRecompilationFor(IParameter[] parameters, string unmodifiedScriptCode, ScriptingOptions Options, out int hash)
         {
-            hash = GetRecompilationTriggerHash(parameters, scriptCode, Options);
+            hash = GetRecompilationTriggerHash(parameters, unmodifiedScriptCode, Options);
 
             if (m_LastCompilation == null)  // nothing has been compiled at all yet, so definitely need to compile now
                 return true;
@@ -875,21 +886,21 @@ namespace RoslynScripting
                 return hash != m_LastCompilation.RecompilationTriggerHash;
         }
 
-        public bool NeedsRecompilationFor(IParameter[] parameters, string scriptCode, ScriptingOptions Options)
+        public bool NeedsRecompilationFor(IParameter[] parameters, string unmodifiedScriptCode, ScriptingOptions Options)
         {
             int _unused;
-            return NeedsRecompilationFor(parameters, scriptCode, Options, out _unused);
+            return NeedsRecompilationFor(parameters, unmodifiedScriptCode, Options, out _unused);
         }
 
 
-        private int GetRecompilationTriggerHash(IParameter[] parameters, string scriptCode, ScriptingOptions Options)
+        private int GetRecompilationTriggerHash(IParameter[] parameters, string unmodifiedScriptCode, ScriptingOptions Options)
         {
             unchecked
             {
                 int hash = (int)2166136261;
 
                 hash = (hash * 16777619) ^ GetRecompilationTriggerHash(parameters);
-                hash = (hash * 16777619) ^ ((scriptCode == null) ? 1 : scriptCode.GetHashCode());
+                hash = (hash * 16777619) ^ ((unmodifiedScriptCode == null) ? 1 : unmodifiedScriptCode.GetHashCode());
                 hash = (hash * 16777619) ^ ((Options == null) ? 1 : Options.GetHashCode());
 
                 return hash;

@@ -27,7 +27,7 @@ namespace ScriptingAbstractions
         IndividualScriptAppDomain
     }
 
-    [Serializable]
+   // [Serializable]
     public class ScriptingOptions : MarshalByRefObject, IXmlSerializable
     {
         public virtual List<Assembly> References { get; protected set; } = new List<Assembly>();

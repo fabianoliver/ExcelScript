@@ -29,7 +29,6 @@ namespace ExcelScript
             // CAREFUL: This method may be run in a different AppDomain! Don't reference anything from outside of the delegate
             Func<MethodInfo[], MethodInfo> EntryMethodSelector = (methods) =>
             {
-                var _DEBUG_APPD = AppDomain.CurrentDomain.Id;
                 MethodInfo result = null;
 
                 // When only one method is available, we'll just return that one...

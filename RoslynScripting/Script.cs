@@ -163,6 +163,42 @@ namespace RoslynScripting
             script.Code = code;
             script.m_ScriptingOptions = ScriptingOptions;
 
+            // TODO: This is not a great solution.. can we improve this?
+            // Ideal would be to avoid double-parsing as to not garbage up the appdomain with lot of unneeded assemblies (or having to create individual ones like below)
+            // but then again we can't use the EntryMethodSelector that nicely anymore
+            // maybe only compile to semanticmodel and work with that?
+            var helper = new HostingHelper();
+            AppDomain domain = null;
+            ParseResult<TGlobals> result;
+
+            try
+            {
+                domain = helper.IndividualScriptDomain;
+                var scriptRunner = (HostedScriptRunner<TGlobals>)Activator.CreateInstance(domain, typeof(HostedScriptRunner<TGlobals>).Assembly.FullName, typeof(HostedScriptRunner<TGlobals>).FullName).Unwrap();
+                var task = RemoteTask.ClientComplete<RoslynScripting.Internal.IParseResult>(scriptRunner.ParseAsync(script.Code, script.m_ScriptingOptions, EntryMethodSelector, EntryMethodParameterFactory), CancellationToken.None);
+
+                var parseResult = await task;
+
+                IList<IParameter> marshalledParameters = new List<IParameter>();
+
+                foreach (var parameter in parseResult.Parameters)
+                    marshalledParameters.Add(new Parameter { DefaultValue = parameter.DefaultValue, Description = parameter.Description, IsOptional = parameter.IsOptional, Name = parameter.Name, Type = parameter.Type });
+
+                script.Code = parseResult.RefactoredCode;
+                script.Parameters = marshalledParameters;
+                result = new ParseResult<TGlobals>(script, parseResult.EntryMethodName);
+            } finally
+            {
+                if(domain != null)
+                    AppDomain.Unload(domain);
+            }
+           
+           
+            return result;
+
+          
+            /*
+
             var hostedScriptRunner = script.GetOrCreateScriptRunner(new IParameter[0], script.Code, script.m_ScriptingOptions);
             var task = RemoteTask.ClientComplete<RoslynScripting.Internal.IParseResult>(hostedScriptRunner.ParseAsync(script.Code, script.m_ScriptingOptions, EntryMethodSelector, EntryMethodParameterFactory), CancellationToken.None);
             var parseResult = await task;
@@ -171,7 +207,7 @@ namespace RoslynScripting
             script.Parameters = parseResult.Parameters.ToList();
 
             var result = new ParseResult<TGlobals>(script, parseResult.EntryMethodName);
-            return result;
+            return result;*/
         }
         
         public IScriptRunResult Run(IEnumerable<IParameterValue> Parameters)
@@ -230,10 +266,13 @@ namespace RoslynScripting
             // C) the AppDomain in which the script runner is hosted is the same that we would like to use now
             if (m_ScriptRunnerCacheInfo != null && !m_ScriptRunnerCacheInfo.ScriptRunner.NeedsRecompilationFor(parameters, scriptCode, Options) && m_ScriptRunnerCacheInfo.HostingDomain == sandbox)
             {
+                Trace.WriteLine("Using cached script runner");
                 return m_ScriptRunnerCacheInfo.ScriptRunner;
             }
             else
             {
+                Trace.WriteLine("Creating new script runner");
+
                 TryUnregisterLease();
 
                 var scriptRunner = (HostedScriptRunner<TGlobals>)Activator.CreateInstance(sandbox, typeof(HostedScriptRunner<TGlobals>).Assembly.FullName, typeof(HostedScriptRunner<TGlobals>).FullName).Unwrap();
