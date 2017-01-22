@@ -20,7 +20,7 @@ Some bonus features:
   3. In any script, e.g. lets say on Sheet "Parse" in cell B18, enter "System.Diagnostics.Debugger.Break();"
   4. When this script is run, your debugger should behave as expected; break execution, show the code, show local variables, etc.
 - The library supports execution in different AppDomains. By default, a script will run in a shared appdomain between all other scripts; you could also pass in an option to run in a shared appdomain with the main addin (ExcelDna's default domain), or to create a seperate appdomain for that script.
-- By default, all functions are marked non-volatile because. Unfortunately, that means that after opening a workbook, you need to refresh each formula that creates a script by hand or macro. ExcelScript offers an experimental way around this, though:
+- By default, all functions are marked non-volatile. Unfortunately, that means that after opening a workbook, you need to refresh each formula that creates a script by hand or macro. ExcelScript offers an experimental way around this, though:
   1. Open The ExcelScript-AddIn.xll.config
   2. set TagDirtyMethodCalls to true
   3. This will mark each cell creating a handle (script, parameter and so on) to dirty once. Could be particularly useful in manual calculation mode (in auto calculation mode, all scripts would run on the next recalculation, so not very useful).
