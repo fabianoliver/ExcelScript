@@ -6,6 +6,7 @@ Aside from doing simple immediate evaluations, some of the core features are:
 - You can create re-usable scripts on the fly in your worksheets, which will be stored in an in-memory cache with a used-defined string key.
 - You can then invoke that script using its key anywhere as often as you like
 - You can define and pass parameters to your scripts, so they can be invoked with arguments
+- Range-objects are fully supported as input parameters (ExcelScript takes care of converting & marshalling these internally)
 - You can create the parameter definitions & script manually, or just parse a function and have the AddIn extract and generate all necessary handles automatically
 - You can even register your script, meaning the AddIn will register a User Defined function with the name and all parameters you defined to invoke your script
 - A helper function lets you format & syntax highlight your C#-code in Excel
