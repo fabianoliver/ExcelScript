@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace RoslynScripting
 {
-   // [Serializable]
+    [Serializable]
     public struct TextSpan
     {
         public readonly int Start;
@@ -121,9 +121,9 @@ namespace RoslynScripting
 
         public FormattedTextLinePart AppendText(string Text, TextFormat Format)
         {
-            var lastPart = Parts.Last();
-            var lastPartLineSpan = lastPart.LineSpan;
-            int SpanStart = _Parts.Any() ? lastPartLineSpan.End : 0;
+            var lastPart = Parts.LastOrDefault();
+            var lastPartLineSpan = lastPart?.LineSpan;
+            int SpanStart = _Parts.Any() ? ((TextSpan)lastPartLineSpan).End : 0;
             int SpanEnd = SpanStart + Text.Length;
 
             var LineSpan = TextSpan.FromBounds(SpanStart, SpanEnd);
